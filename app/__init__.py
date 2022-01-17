@@ -25,17 +25,9 @@ def create_app(sauron):
         if 'event' not in json_data:
             return json.dumps({'success': False}), 200, {'ContentType': 'application/json'}
 
-        print(json_data)
-
-        if json_data['event'].get('type') == 'message':
-            if 'subtype' not in json_data['event']:
-                sauron.handle_message(json_data)
-            else:
-                if json_data['event']['subtype'] == 'message_deleted':
-                    pass
-                if json_data['event']['subtype'] == 'message_changed':
-                    pass
-
+        event_data = json_data['event']
+        if event_data.get('type') == 'message':
+            sauron.handle_message(event_data)
             return json.dumps({'success': True}), 200, {'ContentType': 'application/json'}
 
     return app

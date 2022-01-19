@@ -5,18 +5,9 @@ from datetime import datetime
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 
-from app.enums import SlackEvent, SauronEvent
+from config import *
+from app.enums import SauronEvent
 
-EVENT_COOLDOWN = 1 * 60 * 60
-
-CONTINUE_COOLDOWN = 6 * 60 * 60
-CONTINUE_COUNTER = 3
-
-SPROUT_COOLDOWN = 5 * 60
-SPROUT_COUNTER = 10
-
-BURNING_COOLDOWN = 10 * 60
-BURNING_COUNTER = 20
 
 Message = namedtuple('Message', ['ts', 'dt', 'user', 'text', 'blocks'])
 User = namedtuple('User', ['email_id', 'first_name', 'last_name', 'image'])
@@ -102,11 +93,6 @@ class Thread:
                 self.continue_counter = 0
                 event = SauronEvent.THREAD_CONTINUED
 
-        # 새로운 스레드가 급성장
-        if self.length == SPROUT_COUNTER \
-                and dt_diff(self.replies[SPROUT_COUNTER - 1].dt, self.replies[0].dt) < SPROUT_COOLDOWN:
-            event = SauronEvent.THREAD_SPROUTING
-
         # 스레드가 활활 불타오름
         if self.length >= BURNING_COUNTER \
                 and dt_diff(self.replies[-1].dt, self.replies[-BURNING_COUNTER].dt) < BURNING_COOLDOWN:
@@ -117,6 +103,46 @@ class Thread:
             return event
 
 
+class Block:
+
+    def __init__(self):
+        self.blocks = []
+
+    def add_section(self, text):
+        self.blocks.append({
+            'type': 'section',
+            'text': {
+                'type': 'mrkdwn',
+                'text': text,
+            }
+        })
+
+    def add_divider(self):
+        self.blocks.append({
+            'type': 'divider',
+        })
+
+    def add_message(self, text, name=None, image_url=None, img_alt=None):
+        elements = []
+        if image_url:
+            elements.append({
+                'type': 'image',
+                'image_url': image_url,
+                'alt_text': img_alt or '',
+            })
+        if name:
+            text = f'{name}: {text}'
+        elements.append({
+            'type': 'plain_text',
+            'emoji': True,
+            'text': text,
+        })
+        self.blocks.append({
+            'type': 'context',
+            'elements': elements,
+        })
+
+
 class Sauron:
 
     client = None
@@ -125,10 +151,10 @@ class Sauron:
 
     def __init__(self):
         self.threads = {}
+        self.users = {}
         self.client = WebClient(token=os.environ['SLACK_BOT_TOKEN'])
 
     def handle_message(self, event_data):
-
         # 봇 필터링
         if 'bot_id' in event_data:
             return
@@ -137,8 +163,12 @@ class Sauron:
         channel = event_data['channel']
         subtype = event_data.get('subtype')
 
+        # 필요한 메시지 타입만 남김
+        if subtype and subtype not in ('message_changed', 'message_deleted', 'file_share'):
+            return
+
         try:
-            if subtype is None:
+            if subtype is None or subtype == 'file_share':
                 ts = event_data['ts']
                 thread_ts = event_data.get('thread_ts', ts)
                 user = event_data['user']
@@ -216,7 +246,72 @@ class Sauron:
         return result['ts'], result['thread_ts'], result.get('user'), result['text'], result.get('blocks', [])
 
     def handle_event(self, thread, event):
-        if event:
-            print('=' * 80)
-            print(f'>>>>>>>> {event}, {thread.text}')
-            print('=' * 80)
+        if not event:
+            return None
+
+        print('=' * 80)
+        print(f'>>>>>>>> {event}, {thread.text}')
+        print('=' * 80)
+
+        texts = []
+        channel = ''
+        if event == SauronEvent.THREAD_CONTINUED:
+            texts = [
+                ':arrow_forward: 잠자던 스레드에 새로운 대화가 있습니다.',
+                f'<#{thread.channel}> *{thread.text}*',
+            ]
+            channel = thread.channel
+        elif event == SauronEvent.THREAD_BURNING:
+            texts = [
+                ':fire: 스레드가 활활 불타고 있습니다.',
+                f'<#{thread.channel}> *{thread.text}*',
+            ]
+            channel = FEED_CHANNEL
+
+        self.client.chat_postMessage(
+            channel=channel,
+            text=texts[0],
+            blocks=self.get_blocks(thread, texts),
+            username=BOT_USERNAME,
+            icon_url=BOT_ICON_URL,
+        )
+
+    def get_user_info(self, user_id):
+        if user_id not in self.users:
+            profile = self.client.users_profile_get(user=user_id)['profile']
+            user = User(
+                profile['email'].split('@')[0],
+                profile['first_name'],
+                profile['last_name'].replace('(', '').replace(')', ''),
+                profile['image_original'],
+            )
+            self.users[user_id] = user
+
+        return self.users[user_id]
+
+    def get_permalink(self, channel, ts):
+        result = self.client.chat_getPermalink(
+            channel=channel,
+            message_ts=ts
+        )
+        return result['permalink']
+
+    def get_blocks(self, thread, texts):
+        if not isinstance(texts, list):
+            texts = [texts]
+
+        block = Block()
+        for text in texts:
+            block.add_section(text)
+        block.add_divider()
+        for i in range(-RECENT_REPLY_NUM, 0):
+            reply = thread.replies[i]
+            user = self.get_user_info(reply.user)
+            email_id = user.email_id
+            name = user.last_name
+            image = user.image
+            reply_text = reply.text
+            block.add_message(reply_text, name=name, image_url=image, img_alt=email_id)
+        permalink = self.get_permalink(thread.channel, thread.ts)
+        block.add_section(permalink)
+        return block.blocks

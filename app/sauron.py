@@ -66,7 +66,7 @@ class Thread:
         self.replies.append(message)
         self.length += 1
         if not skip_event:
-            return self.check_events()
+            return self.check_event()
 
     def change_reply(self, ts, user, text, blocks):
         for i in range(len(self.replies)):
@@ -83,7 +83,7 @@ class Thread:
                 return True
         return False
 
-    def check_events(self):
+    def check_event(self):
         now = datetime.now()
 
         # 이벤트 반복 트리거 방지
@@ -156,8 +156,8 @@ class Sauron:
             else:
                 text = ''
                 blocks = []
-        except KeyError:
-            print(f'ERROR: {event_data}')
+        except KeyError as e:
+            print(f'ERROR: {e} \n {event_data}')
             return
 
         if ts == thread_ts:
@@ -166,13 +166,13 @@ class Sauron:
         # 스레드에 속한 메시지인데, 소속 스레드가 사우론에 없으면 스레드 정보를 받아온다.
         if thread_ts not in self.threads:
             replies = self.get_replies(thread_ts, channel)
+            num_replies = len(replies)
             message = replies[0]
             self.threads[thread_ts] = Thread(message[0], channel, message[2], message[3], message[4])
-            for i in range(1, len(replies)):
+            for i in range(1, num_replies):
                 reply = replies[i]
-                # 신규 메시지 외에는 이벤트를 발생시키지 않도록 한다.
-                skip_event = i == len(replies) - 2
-                self.threads[thread_ts].add_reply(reply[0], reply[2], reply[3], reply[4], skip_event=skip_event)
+                # 기존 메시지 불러올 때는 이벤트 트리거 하지 않음
+                self.threads[thread_ts].add_reply(reply[0], reply[2], reply[3], reply[4], skip_event=True)
 
         # 작성/수정/삭제 처리
         thread = self.threads[thread_ts]
@@ -217,4 +217,6 @@ class Sauron:
 
     def handle_event(self, thread, event):
         if event:
-            print(f'{event}, {thread.text}')
+            print('=' * 80)
+            print(f'>>>>>>>> {event}, {thread.text}')
+            print('=' * 80)

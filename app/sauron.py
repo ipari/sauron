@@ -255,16 +255,19 @@ class Sauron:
 
         texts = []
         channel = ''
+        permalink = self.get_permalink(thread.channel, thread.ts)
+        thread_text = f'<#{thread.channel}>: *{thread.text}* <{permalink}|[스레드]>'
+
         if event == SauronEvent.THREAD_CONTINUED:
             texts = [
                 ':arrow_forward: 잠자던 스레드에 새로운 대화가 있습니다.',
-                f'<#{thread.channel}> *{thread.text}*',
+                thread_text,
             ]
             channel = thread.channel
         elif event == SauronEvent.THREAD_BURNING:
             texts = [
                 ':fire: 스레드가 활활 불타고 있습니다.',
-                f'<#{thread.channel}> *{thread.text}*',
+                thread_text,
             ]
             channel = FEED_CHANNEL
 
@@ -274,6 +277,7 @@ class Sauron:
             blocks=self.get_blocks(thread, texts),
             username=BOT_USERNAME,
             icon_url=BOT_ICON_URL,
+            unfurl_links=False,
         )
 
     def get_user_info(self, user_id):
@@ -312,6 +316,4 @@ class Sauron:
             image = user.image
             reply_text = reply.text
             block.add_message(reply_text, name=name, image_url=image, img_alt=email_id)
-        permalink = self.get_permalink(thread.channel, thread.ts)
-        block.add_section(permalink)
         return block.blocks

@@ -98,6 +98,10 @@ class Thread:
                 and dt_diff(self.replies[-1].dt, self.replies[-BURNING_COUNTER].dt) < BURNING_COOLDOWN:
             event = SauronEvent.THREAD_BURNING
 
+        # 스레드 답글 개수가 매 n개일 때
+        if (self.length - 1) % EVERY_N_REPLY == 0:
+            event = SauronEvent.THREAD_N_REPLY
+
         if event:
             self.last_event_dt = now
             return event
@@ -262,6 +266,9 @@ class Sauron:
             channel = thread.channel
         elif event == SauronEvent.THREAD_BURNING:
             event_text = ':fire: 스레드가 활활 불타고 있습니다.'
+            channel = FEED_CHANNEL
+        elif event == SauronEvent.THREAD_N_REPLY:
+            event_text = f':heart: 스레드에 {thread.length - 1}개의 답글이 달렸습니다.'
             channel = FEED_CHANNEL
 
         self.client.chat_postMessage(

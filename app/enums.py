@@ -8,6 +8,6 @@ class SlackEvent(Enum):
 
 
 class SauronEvent(Enum):
-    THREAD_SPROUTING = 1
-    THREAD_BURNING = 2
-    THREAD_CONTINUED = 3
+    THREAD_BURNING = 1
+    THREAD_CONTINUED = 2
+    THREAD_N_REPLY = 3

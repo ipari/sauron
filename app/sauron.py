@@ -259,7 +259,7 @@ class Sauron:
         channel = ''
         permalink = self.get_permalink(thread.channel, thread.ts)
         event_text = ''
-        thread_text = f'<#{thread.channel}>: *{thread.text}* <{permalink}|[스레드]>'
+        thread_text = f'<#{thread.channel}>: {thread.text} <{permalink}|[스레드]>'
 
         if event == SauronEvent.THREAD_CONTINUED:
             event_text = ':arrow_forward: 잠자던 스레드에 새로운 대화가 있습니다.'

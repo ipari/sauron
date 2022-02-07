@@ -98,6 +98,10 @@ class Thread:
                 and dt_diff(self.replies[-1].dt, self.replies[-BURNING_COUNTER].dt) < BURNING_COOLDOWN:
             event = SauronEvent.THREAD_BURNING
 
+        # 스레드 답글 개수가 매 n개일 때
+        if (self.length - 1) % EVERY_N_REPLY == 0:
+            event = SauronEvent.THREAD_N_REPLY
+
         if event:
             self.last_event_dt = now
             return event
@@ -133,8 +137,7 @@ class Block:
         if name:
             text = f'{name}: {text}'
         elements.append({
-            'type': 'plain_text',
-            'emoji': True,
+            'type': 'mrkdwn',
             'text': text,
         })
         self.blocks.append({
@@ -253,27 +256,31 @@ class Sauron:
         print(f'>>>>>>>> {event}, {thread.text}')
         print('=' * 80)
 
-        texts = []
         channel = ''
+        permalink = self.get_permalink(thread.channel, thread.ts)
+        event_text = ''
+        thread_text = f'<#{thread.channel}>: {thread.text} <{permalink}|[스레드]>'
+
         if event == SauronEvent.THREAD_CONTINUED:
-            texts = [
-                ':arrow_forward: 잠자던 스레드에 새로운 대화가 있습니다.',
-                f'<#{thread.channel}> *{thread.text}*',
-            ]
+            event_text = ':arrow_forward: 잠자던 스레드에 새로운 대화가 있습니다.'
             channel = thread.channel
         elif event == SauronEvent.THREAD_BURNING:
-            texts = [
-                ':fire: 스레드가 활활 불타고 있습니다.',
-                f'<#{thread.channel}> *{thread.text}*',
-            ]
+            event_text = ':fire: 스레드가 활활 불타고 있습니다.'
+            channel = FEED_CHANNEL
+        elif event == SauronEvent.THREAD_N_REPLY:
+            event_text = f':heart: 스레드에 {thread.length - 1}개의 답글이 달렸습니다.'
             channel = FEED_CHANNEL
 
         self.client.chat_postMessage(
             channel=channel,
-            text=texts[0],
-            blocks=self.get_blocks(thread, texts),
+            text=thread_text,
+            blocks=self.get_blocks(
+                thread,
+                event_text=event_text,
+                thread_text=thread_text),
             username=BOT_USERNAME,
             icon_url=BOT_ICON_URL,
+            unfurl_links=False,
         )
 
     def get_user_info(self, user_id):
@@ -296,14 +303,11 @@ class Sauron:
         )
         return result['permalink']
 
-    def get_blocks(self, thread, texts):
-        if not isinstance(texts, list):
-            texts = [texts]
-
+    def get_blocks(self, thread, event_text=None, thread_text=None):
         block = Block()
-        for text in texts:
-            block.add_section(text)
+        block.add_section(event_text)
         block.add_divider()
+        block.add_section(thread_text)
         for i in range(-RECENT_REPLY_NUM, 0):
             reply = thread.replies[i]
             user = self.get_user_info(reply.user)
@@ -312,6 +316,5 @@ class Sauron:
             image = user.image
             reply_text = reply.text
             block.add_message(reply_text, name=name, image_url=image, img_alt=email_id)
-        permalink = self.get_permalink(thread.channel, thread.ts)
-        block.add_section(permalink)
+        block.add_divider()
         return block.blocks

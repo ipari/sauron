@@ -14,6 +14,7 @@ Message = namedtuple('Message', ['ts', 'dt', 'user', 'text', 'blocks'])
 User = namedtuple('User', ['email_id', 'first_name', 'last_name', 'display_name', 'image'])
 
 USER_ID_PATTERN = r'<@U([\w]+)>'
+GROUP_ID_PATTERN = r'<!subteam\^[\w]+\|(@[\w]+)>'
 
 
 def dt_from_ts(ts):
@@ -275,11 +276,19 @@ class Sauron:
             channel = FEED_CHANNEL
 
         event_text = f'{event_text} <{permalink}|[스레드]>'
-        # 유저 멘션으로 스레드가 시작되면 이벤트를 퍼갈 때 호출이 한번 더 발생한다.
-        # 유저 멘션을 플레인 텍스트로 바꾼다.
+
+        # 멘션으로 스레드가 시작되면 이벤트를 퍼갈 때 호출이 한번 더 발생한다.
+        # 일반 텍스트로 변경하여 불필요한 호출을 막는다.
+        # 1. User mention -> Plain text
         thread_text = re.sub(
             USER_ID_PATTERN,
             lambda m: '@' + self.get_user_info(f'U{m.group(1)}').display_name,
+            thread_text
+        )
+        # 2. User group mention -> Plain text
+        thread_text = re.sub(
+            GROUP_ID_PATTERN,
+            lambda m: m.group(1),
             thread_text
         )
 

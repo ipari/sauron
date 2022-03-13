@@ -1,4 +1,5 @@
 import os
+import re
 
 from collections import namedtuple
 from datetime import datetime
@@ -10,7 +11,10 @@ from app.enums import SauronEvent
 
 
 Message = namedtuple('Message', ['ts', 'dt', 'user', 'text', 'blocks'])
-User = namedtuple('User', ['email_id', 'first_name', 'last_name', 'image'])
+User = namedtuple('User', ['email_id', 'first_name', 'last_name', 'display_name', 'image'])
+
+USER_ID_PATTERN = r'<@U([\w]+)>'
+GROUP_ID_PATTERN = r'<!subteam\^[\w]+\|(@[\w]+)>'
 
 
 def dt_from_ts(ts):
@@ -259,7 +263,7 @@ class Sauron:
         channel = ''
         permalink = self.get_permalink(thread.channel, thread.ts)
         event_text = ''
-        thread_text = f'<#{thread.channel}>: {thread.text} <{permalink}|[스레드]>'
+        thread_text = f'<#{thread.channel}>: {thread.text}'
 
         if event == SauronEvent.THREAD_CONTINUED:
             event_text = ':arrow_forward: 잠자던 스레드에 새로운 대화가 있습니다.'
@@ -270,6 +274,23 @@ class Sauron:
         elif event == SauronEvent.THREAD_N_REPLY:
             event_text = f':heart: 스레드에 {thread.length - 1}개의 답글이 달렸습니다.'
             channel = FEED_CHANNEL
+
+        event_text = f'{event_text} <{permalink}|[스레드]>'
+
+        # 멘션으로 스레드가 시작되면 이벤트를 퍼갈 때 호출이 한번 더 발생한다.
+        # 일반 텍스트로 변경하여 불필요한 호출을 막는다.
+        # 1. User mention -> Plain text
+        thread_text = re.sub(
+            USER_ID_PATTERN,
+            lambda m: '@' + self.get_user_info(f'U{m.group(1)}').display_name,
+            thread_text
+        )
+        # 2. User group mention -> Plain text
+        thread_text = re.sub(
+            GROUP_ID_PATTERN,
+            lambda m: m.group(1),
+            thread_text
+        )
 
         self.client.chat_postMessage(
             channel=channel,
@@ -290,6 +311,7 @@ class Sauron:
                 profile['email'].split('@')[0],
                 profile['first_name'],
                 profile['last_name'].replace('(', '').replace(')', ''),
+                profile['display_name'],
                 profile['image_original'],
             )
             self.users[user_id] = user

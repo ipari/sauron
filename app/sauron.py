@@ -13,7 +13,7 @@ from app.enums import SauronEvent
 Message = namedtuple('Message', ['ts', 'dt', 'user', 'text', 'blocks'])
 User = namedtuple('User', ['email_id', 'first_name', 'last_name', 'display_name', 'image'])
 
-USER_ID_PATTERN = r'<@U([\w]+)>'
+USER_ID_PATTERN = r'<@(U[\w]+)>'
 GROUP_ID_PATTERN = r'<!subteam\^[\w]+\|(@[\w]+)>'
 
 
@@ -282,13 +282,13 @@ class Sauron:
         # 1. User mention -> Plain text
         thread_text = re.sub(
             USER_ID_PATTERN,
-            lambda m: '@' + self.get_user_info(f'U{m.group(1)}').display_name,
+            lambda m: f'`@{self.get_user_info(m.group(1)).display_name}`',
             thread_text
         )
         # 2. User group mention -> Plain text
         thread_text = re.sub(
             GROUP_ID_PATTERN,
-            lambda m: m.group(1),
+            lambda m: f'`{m.group(1)}`',
             thread_text
         )
 

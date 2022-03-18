@@ -276,21 +276,7 @@ class Sauron:
             channel = FEED_CHANNEL
 
         event_text = f'{event_text} <{permalink}|[스레드]>'
-
-        # 멘션으로 스레드가 시작되면 이벤트를 퍼갈 때 호출이 한번 더 발생한다.
-        # 일반 텍스트로 변경하여 불필요한 호출을 막는다.
-        # 1. User mention -> Plain text
-        thread_text = re.sub(
-            USER_ID_PATTERN,
-            lambda m: f'`@.{self.get_user_info(m.group(1)).display_name}`',
-            thread_text
-        )
-        # 2. User group mention -> Plain text
-        thread_text = re.sub(
-            GROUP_ID_PATTERN,
-            lambda m: f'`@.{m.group(1)}`',
-            thread_text
-        )
+        thread_text = self.replace_mentions(thread_text)
 
         self.client.chat_postMessage(
             channel=channel,
@@ -336,7 +322,26 @@ class Sauron:
             email_id = user.email_id
             name = user.last_name
             image = user.image
-            reply_text = reply.text
+            reply_text = self.replace_mentions(reply.text)
             block.add_message(reply_text, name=name, image_url=image, img_alt=email_id)
         block.add_divider()
         return block.blocks
+
+    def replace_mentions(self, text):
+        """
+        멘션으로 스레드가 시작되면 이벤트를 퍼갈 때 호출이 한번 더 발생한다.
+        일반 텍스트로 변경하여 불필요한 호출을 막는다.
+        """
+        # 1. User mention -> Plain text
+        text = re.sub(
+            USER_ID_PATTERN,
+            lambda m: f'`@.{self.get_user_info(m.group(1)).display_name}`',
+            text
+        )
+        # 2. User group mention -> Plain text
+        text = re.sub(
+            GROUP_ID_PATTERN,
+            lambda m: f'`@.{m.group(1)}`',
+            text
+        )
+        return text

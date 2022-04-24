@@ -15,6 +15,8 @@ User = namedtuple('User', ['email_id', 'first_name', 'last_name', 'display_name'
 
 USER_ID_PATTERN = r'<@(U[\w]+)>'
 GROUP_ID_PATTERN = r'<!subteam\^[\w]+\|@([\w]+)>'
+CHANNEL_ID_PATTERN = r'<#[0-9A-Z]+\|([\w-]+)>'
+LINK_PATTERN = r'<http[s]*:\/\/([^>]*)>'
 
 
 def dt_from_ts(ts):
@@ -275,7 +277,7 @@ class Sauron:
             event_text = f':heart: 스레드에 {thread.length - 1}개의 답글이 달렸습니다.'
             channel = FEED_CHANNEL
 
-        event_text = f'{event_text} <{permalink}|[스레드]>'
+        event_text = f'{event_text} <{permalink}|[이동]>'
         thread_text = self.replace_mentions(thread_text)
 
         self.client.chat_postMessage(
@@ -322,10 +324,15 @@ class Sauron:
             email_id = user.email_id
             name = user.last_name
             image = user.image
-            reply_text = self.replace_mentions(reply.text)
+            reply_text = self.process_reply_text(reply.text)
             block.add_message(reply_text, name=name, image_url=image, img_alt=email_id)
         block.add_divider()
         return block.blocks
+
+    def process_reply_text(self, text):
+        text = self.replace_mentions(text)
+        text = self.trim_message(text)
+        return text
 
     def replace_mentions(self, text):
         """
@@ -344,4 +351,19 @@ class Sauron:
             lambda m: f'`@.{m.group(1)}`',
             text
         )
+        return text
+
+    @staticmethod
+    def remove_format(text):
+        text = re.sub(CHANNEL_ID_PATTERN, r'#\g<1>', text)
+        text = re.sub(LINK_PATTERN, '', text)
+        return text
+
+    def trim_message(self, text):
+        ps = text.split('\n')
+        length = 0
+        for i, p in enumerate(ps):
+            length += len(self.remove_format(p))
+            if length > MAX_TEXT_LENGTH:
+                return '\n'.join(ps[:i])
         return text

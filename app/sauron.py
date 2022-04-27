@@ -365,5 +365,5 @@ class Sauron:
         for i, p in enumerate(ps):
             length += len(self.remove_format(p))
             if length > MAX_TEXT_LENGTH:
-                return '\n'.join(ps[:i])
+                return '\n'.join(ps[:i+1]) + ' [...]'
         return text

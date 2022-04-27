@@ -278,7 +278,7 @@ class Sauron:
             channel = FEED_CHANNEL
 
         event_text = f'{event_text} <{permalink}|[이동]>'
-        thread_text = self.replace_mentions(thread_text)
+        thread_text = self.process_text(thread_text)
 
         self.client.chat_postMessage(
             channel=channel,
@@ -324,12 +324,12 @@ class Sauron:
             email_id = user.email_id
             name = user.last_name
             image = user.image
-            reply_text = self.process_reply_text(reply.text)
+            reply_text = self.process_text(reply.text)
             block.add_message(reply_text, name=name, image_url=image, img_alt=email_id)
         block.add_divider()
         return block.blocks
 
-    def process_reply_text(self, text):
+    def process_text(self, text):
         text = self.replace_mentions(text)
         text = self.trim_message(text)
         return text
